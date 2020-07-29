@@ -2,6 +2,7 @@
 
 const db = require("../db");
 const ExpressError = require("../expressError");
+const {getCurrentTime} = require('../get_date')
 
 
 /** Message on the site. */
@@ -12,30 +13,32 @@ class Message {
    *    {id, from_username, to_username, body, sent_at}
    */
 
-  static async create({from_username, to_username, body}) {
+  static async create({ from_username, to_username, body }) {
+    console.log(from_username, to_username, body)
     const result = await db.query(
         `INSERT INTO messages (
               from_username,
               to_username,
               body,
               sent_at)
-            VALUES ($1, $2, $3, current_timestamp)
+            VALUES ($1, $2, $3, $4)
             RETURNING id, from_username, to_username, body, sent_at`,
-        [from_username, to_username, body]);
+        [from_username, to_username, body, getCurrentTime()]);
 
     return result.rows[0];
   }
 
   /** Update read_at for message */
 
-  static async markRead(id) {
+  static async markRead(id, to) {
     const result = await db.query(
         `UPDATE messages
-           SET read_at = current_timestamp
-           WHERE id = $1
+           SET read_at = $1
+           WHERE id = $2
+           AND to_username = $3
            RETURNING id, read_at`,
-        [id]);
-
+        [getCurrentTime() ,id, to]);
+      console.log(result.rows)
     if (!result.rows[0]) {
       throw new ExpressError(`No such message: ${id}`, 404);
     }
@@ -96,6 +99,19 @@ class Message {
       read_at: m.read_at,
     };
   }
+
+
+  static canView(current,from, to) {
+    if (current == from ||current  == to) {
+      return true
+
+    }
+    else{
+        throw new ExpressError('You can\'t view this message', 404)
+
+        }
+  }
+
 }
 
 

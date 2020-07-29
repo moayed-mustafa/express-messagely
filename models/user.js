@@ -1,4 +1,11 @@
 /** User class for message.ly */
+const db = require('../db')
+const ExpressError = require('../expressError')
+const bcrypt = require('bcrypt')
+const jwt = require('jsonwebtoken')
+const { BCRYPT_WORK_FACTOR} = require('../config')
+const { SECRET_KEY } = require('../config')
+const {getCurrentTime} = require('../get_date')
 
 
 
@@ -10,20 +17,79 @@ class User {
    *    {username, password, first_name, last_name, phone}
    */
 
-  static async register({username, password, first_name, last_name, phone}) { }
+  static async register( username, password, first_name, last_name, phone ) {
+    try {
+      // check if all the data is actually present
+    if (!username || !password || !first_name || !last_name || !phone) {
+
+        throw new ExpressError(" Some data is missing", 422)
+    }
+    console.log(username, password, first_name,last_name, phone)
+      const hashed_password = await bcrypt.hash(password, BCRYPT_WORK_FACTOR)
+      console.log(hashed_password)
+      const join_at = getCurrentTime()
+      console.log(join_at)
+
+      const result = await db.query(`
+        INSERT INTO users (username, password, first_name, last_name, phone, join_at)
+        VALUES ($1,$2,$3,$4,$5, $6)
+        RETURNING username `, [username, hashed_password, first_name, last_name, phone, join_at]);
+
+    return result.rows[0]
+
+    } catch (e) {
+      throw new ExpressError('Duplicate User', 422)
+  }
+    }
+
+
 
   /** Authenticate: is this username/password valid? Returns boolean. */
 
-  static async authenticate(username, password) { }
+  static async authenticate(username, password) {
+    const result = await db.query(`
+        SELECT username, password FROM users
+        WHERE username = $1
+        `, [username])
+    const user = result.rows[0]
+    if (user) {
+
+      if (await bcrypt.compare(password, user.password)) {
+
+        // make a token
+        const token = jwt.sign({ user }, SECRET_KEY)
+        return { user, token }
+      }
+
+    }
+  }
 
   /** Update last_login_at for user */
 
-  static async updateLoginTimestamp(username) { }
+  static async updateLoginTimestamp(username) {
 
-  /** All: basic info on all users:
-   * [{username, first_name, last_name, phone}, ...] */
+    const currentTimeStamp = getCurrentTime()
+    console.log(currentTimeStamp)
+        await db.query(`
+        UPDATE users
+        SET last_login_at= $1
+        WHERE username = $2
+        `,[currentTimeStamp,username])
+    /** All: basic info on all users:
+     * [{username, first_name, last_name, phone}, ...] */
 
-  static async all() { }
+  }
+
+  static async all() {
+    const result = await db.query(`
+    SELECT username, first_name, last_name, phone
+    FROM USERS
+    `)
+    return result.rows
+
+  }
+
+
 
   /** Get: get user by username
    *
@@ -33,8 +99,21 @@ class User {
    *          phone,
    *          join_at,
    *          last_login_at } */
+  static async get(username) {
+    // check if username exists
+    if (username == undefined) {
+      throw new ExpressError('name is not available', 404)
+    }
+      const result = await db.query(`
+      SELECT username, first_name, last_name, phone
+      FROM USERS
+      WHERE username = $1
+      `, [username])
+      return result.rows
 
-  static async get(username) { }
+  }
+
+
 
   /** Return messages from this user.
    *
@@ -43,10 +122,19 @@ class User {
    * where to_user is
    *   {username, first_name, last_name, phone}
    */
+  static async messagesFrom(username) {
+    if (username == undefined) {
+      throw new ExpressError('name is not available', 404)
+    }
+    const messagesFromUser = await db.query(`
+    SELECT id, to_username, body, sent_at, read_at
+    FROM messages
+    WHERE from_username = $1
+    `, [username])
+    return messagesFromUser.rows
+  }
 
-  static async messagesFrom(username) { }
-
-  /** Return messages to this user.
+/** Return messages to this user.
    *
    * [{id, from_user, body, sent_at, read_at}]
    *
@@ -54,7 +142,19 @@ class User {
    *   {id, first_name, last_name, phone}
    */
 
-  static async messagesTo(username) { }
+
+
+  static async messagesTo(username) {
+    if (username == undefined) {
+      throw new ExpressError('name is not available', 404)
+    }
+    const messagesToUser = await db.query(`
+    SELECT id, from_username, body, sent_at, read_at
+    FROM messages
+    WHERE to_username = $1
+    `, [username])
+    return messagesToUser.rows
+  }
 }
 
 
