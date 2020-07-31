@@ -1,3 +1,7 @@
+-- to run the tests, change messagely on lines :
+-- 4,5,7 to messagely_test then run psql < data.sql on terminals
+
+
 DROP DATABASE IF EXISTS messagely;
 CREATE DATABASE messagely;
 

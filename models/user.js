@@ -21,20 +21,16 @@ class User {
     try {
       // check if all the data is actually present
     if (!username || !password || !first_name || !last_name || !phone) {
-
+        console.log(username)
         throw new ExpressError(" Some data is missing", 422)
     }
-    console.log(username, password, first_name,last_name, phone)
       const hashed_password = await bcrypt.hash(password, BCRYPT_WORK_FACTOR)
-      console.log(hashed_password)
       const join_at = getCurrentTime()
-      console.log(join_at)
 
       const result = await db.query(`
         INSERT INTO users (username, password, first_name, last_name, phone, join_at)
         VALUES ($1,$2,$3,$4,$5, $6)
         RETURNING username `, [username, hashed_password, first_name, last_name, phone, join_at]);
-
     return result.rows[0]
 
     } catch (e) {
@@ -105,11 +101,11 @@ class User {
       throw new ExpressError('name is not available', 404)
     }
       const result = await db.query(`
-      SELECT username, first_name, last_name, phone
+      SELECT username, first_name, last_name, phone,last_login_at, join_at
       FROM USERS
       WHERE username = $1
       `, [username])
-      return result.rows
+      return result.rows[0]
 
   }
 
@@ -131,6 +127,7 @@ class User {
     FROM messages
     WHERE from_username = $1
     `, [username])
+    console.log("messages in the messages class ")
     return messagesFromUser.rows
   }
 

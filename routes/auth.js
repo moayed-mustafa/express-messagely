@@ -1,6 +1,5 @@
 const express = require("express")
 const router = express.Router()
-const expressError = require('../expressError')
 
 const User = require('../models/user')
 const bodyParser = require("body-parser")
